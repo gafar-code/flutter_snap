@@ -341,6 +341,7 @@ class _MyAppState extends State<MyApp> {
     ));
   }
 
+  // Run powershell script
   String runPowerShellScript(String hotKey) {
     final currentDir = kDebugMode ? r"C:\Users\Administrator\app\desktop" : Directory.current.path;
     return Process.runSync(
