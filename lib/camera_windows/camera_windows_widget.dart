@@ -318,10 +318,10 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
 
           if (image != null) {
             img.Image rotatedImage = img.copyRotate(image, angle: -90);
-            // img.Image flipImage = img.copyFlip(rotatedImage,
-            //     direction: img.FlipDirection.horizontal);
+            img.Image flipImage = img.copyFlip(rotatedImage,
+                direction: img.FlipDirection.horizontal);
             File outputFile = File(file.path);
-            await outputFile.writeAsBytes(img.encodeJpg(rotatedImage));
+            await outputFile.writeAsBytes(img.encodeJpg(flipImage));
             widget.onCapture!(outputFile);
 
             if (mounted) setState(() {});

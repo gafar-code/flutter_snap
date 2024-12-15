@@ -1,3 +1,5 @@
+import 'dart:developer';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_snap/camera_windows/camera_windows_controller.dart';
 import 'package:flutter_snap/camera_windows/camera_windows_widget.dart';
@@ -60,6 +62,9 @@ class _MyAppState extends State<MyApp> {
               ),
               CameraWindowsWidget(
                 onCameraInitialized:(c) => _camC = c,
+                onCapture: (p0) {
+                  log(p0.path);
+                },
               ),
             ],
           ),
