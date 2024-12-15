@@ -17,7 +17,7 @@ import 'camera_windows_controller.dart';
 import 'camera_windows_status.dart';
 
 class CameraWindowsWidget extends StatefulWidget {
-  final CameraWindowsController controller;
+  final void Function(CameraWindowsController) onCameraInitialized;
   final CameraType type;
   final Widget? loadingWidget;
   final Widget? connectedWiget;
@@ -28,12 +28,10 @@ class CameraWindowsWidget extends StatefulWidget {
   final Widget? closedWidget;
   final Function(File)? onCapture;
   final Widget? overlayWidget;
-  final Size cameraPreviewSize;
   const CameraWindowsWidget(
       {super.key,
-      required this.controller,
+      required this.onCameraInitialized,
       this.type = CameraType.selfie,
-      required this.cameraPreviewSize,
       this.connectedWiget,
       this.notConnectedWidget,
       this.errorWidget,
@@ -51,6 +49,7 @@ class CameraWindowsWidget extends StatefulWidget {
 class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
     with SingleTickerProviderStateMixin {
   late AnimationController _controller;
+  late CameraWindowsController _camC;
 
   late CameraStatus _status;
   int countTakePhoto = 4;
@@ -66,8 +65,8 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
   Timer? _timerTakeQr;
   Uint8List? _capturedImage;
   XFile? _imgTmp;
+  Size cameraPreviewSize = const Size(1080, 1920);
 
-  late Size cameraPreviewSize;
   final MediaSettings _mediaSettings = const MediaSettings(
     resolutionPreset: ResolutionPreset.max,
     fps: 30,
@@ -82,12 +81,13 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
     WidgetsFlutterBinding.ensureInitialized();
     _status = CameraStatusOpened('Open');
     _openCam();
-    widget.controller.openCam = _openCam;
-    widget.controller.retry = _retry;
-    widget.controller.pause = _pause;
-    widget.controller.stop = _stop;
-    widget.controller.resume = _resume;
-    widget.controller.capture = _capture;
+    _camC = CameraWindowsController()
+      ..openCam = _openCam
+      ..retry = _retry
+      ..pause = _pause
+      ..stop = _stop
+      ..resume = _resume
+      ..capture = _capture;
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 2),
@@ -109,6 +109,7 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
     // int cameraIndex = 0;
     try {
       cameras = await CameraPlatform.instance.availableCameras();
+      log(cameras.toString());
       if (cameras.isEmpty) {
         cameraInfo = 'No available cameras';
         _status = CameraStatusNotConnected(cameraInfo);
@@ -136,7 +137,7 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
 
     int cameraId = 1;
     // final int cameraIndex = (_cameraIndex + 1) % _cameras.length;
-    final CameraDescription camera = _cameras[0];
+    final CameraDescription camera = _cameras[1];
 
     cameraId = await CameraPlatform.instance.createCameraWithSettings(
       camera,
@@ -216,18 +217,20 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
   }
 
   void readQr() async {
-    _timerTakeQr = Timer.periodic(2.seconds, (timer) async {
-      final XFile file = await CameraPlatform.instance.takePicture(cameraIds);
-      final result = await zx.readBarcodeImagePath(
-          file, DecodeParams(imageFormat: ImageFormat.rgb));
-      if (result.text != null) {
-        _timerTakeQr?.cancel();
-        _deleteImageTemp(file);
-        widget.controller.onScan!(result.text!);
-      } else {
-        _deleteImageTemp(file);
-      }
-    });
+    if (_camC.onScan != null) {
+      _timerTakeQr = Timer.periodic(2.seconds, (timer) async {
+        final XFile file = await CameraPlatform.instance.takePicture(cameraIds);
+        final result = await zx.readBarcodeImagePath(
+            file, DecodeParams(imageFormat: ImageFormat.rgb));
+        if (result.text != null) {
+          _timerTakeQr?.cancel();
+          _deleteImageTemp(file);
+          _camC.onScan!(result.text!);
+        } else {
+          _deleteImageTemp(file);
+        }
+      });
+    }
   }
 
   void _deleteImageTemp(XFile? file) async {
@@ -297,7 +300,7 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
   }
 
   Future<void> _capture() async {
-    if (widget.type == CameraType.selfie) {
+    if (widget.type == CameraType.selfie && widget.onCapture != null) {
       _timer?.cancel();
 
       _timer = Timer.periodic(const Duration(seconds: 1), (value) async {
@@ -315,10 +318,10 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
 
           if (image != null) {
             img.Image rotatedImage = img.copyRotate(image, angle: -90);
-            img.Image flipImage = img.copyFlip(rotatedImage,
-                direction: img.FlipDirection.horizontal);
+            // img.Image flipImage = img.copyFlip(rotatedImage,
+            //     direction: img.FlipDirection.horizontal);
             File outputFile = File(file.path);
-            await outputFile.writeAsBytes(img.encodeJpg(flipImage));
+            await outputFile.writeAsBytes(img.encodeJpg(rotatedImage));
             widget.onCapture!(outputFile);
 
             if (mounted) setState(() {});
@@ -358,7 +361,9 @@ class _CameraWindowsWidgetState extends State<CameraWindowsWidget>
             child: Stack(
               children: [
                 Positioned.fill(
-                  child: CameraPlatform.instance.buildPreview(cameraIds),
+                  child: Transform.flip(
+                    flipY: true,
+                    child: CameraPlatform.instance.buildPreview(cameraIds)),
                 ),
                 if (widget.overlayWidget != null)
                   Positioned.fill(

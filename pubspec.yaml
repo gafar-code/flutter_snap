@@ -8,6 +8,7 @@ environment:
   flutter: '>=3.3.0'
 
 dependencies:
+  camera_windows: ^0.2.6+1
   camera_platform_interface: ^2.8.0
   flutter:
     sdk: flutter
